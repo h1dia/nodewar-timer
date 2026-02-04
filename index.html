@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>拠点戦タイマー</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --danger: #ef4444;
+            --success: #10b981;
+            --delay-color: #fbbf24;
+            --info-bg: #334155;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Consolas', 'Monaco', 'Meiryo', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        h1 { color: var(--accent); margin-bottom: 30px; letter-spacing: 2px; }
+
+        .wrapper {
+            display: flex;
+            gap: 30px;
+            max-width: 950px;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: flex-direction 0.3s ease;
+        }
+        .wrapper.reverse { flex-direction: row-reverse; }
+
+        .settings-panel {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            flex: 0 0 400px;
+            text-align: center;
+        }
+
+        #live-clock { font-size: 4rem; font-weight: 800; color: var(--accent); margin-bottom: 1rem; }
+
+        .delay-section {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid var(--delay-color);
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+            display: flex; justify-content: center; align-items: center; gap: 10px;
+        }
+
+        .input-number {
+            background: #334155; border: 1px solid #475569; color: white;
+            padding: 5px; border-radius: 4px; text-align: center;
+        }
+
+        .alarm-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; justify-content: center; }
+
+        .countdown-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        .countdown-card {
+            background: var(--card); padding: 15px 25px; border-radius: 12px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-left: 4px solid var(--accent);
+        }
+        .countdown-card.finished { border-left-color: #475569; opacity: 0.5; }
+        .card-timer { font-size: 1.6rem; color: var(--delay-color); }
+
+        .action-bar {
+            max-width: 950px; width: 100%;
+            display: flex; gap: 10px; margin-bottom: 20px;
+        }
+
+        .btn { cursor: pointer; border: none; border-radius: 5px; padding: 10px 15px; font-weight: bold; transition: 0.2s; }
+        .btn-utility { background: #64748b; color: white; flex: 1; }
+        .btn-add { background: var(--success); color: white; width: 100%; margin-top: 10px; }
+        .btn-del { background: var(--danger); color: white; }
+
+        .info-card {
+            max-width: 950px; width: 100%; background: var(--info-bg);
+            padding: 1.5rem 2rem; border-radius: 15px; line-height: 1.6;
+        }
+        .info-card h2 { margin-top: 0; font-size: 1.2rem; color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="wrapper" id="main-wrapper">
+        <div class="settings-panel">
+            <div id="live-clock">00:00:00</div>
+            <div class="delay-section">
+                <label>遅延:</label>
+                <input type="number" id="global-delay" class="input-number" value="0" min="0" style="width: 60px;">
+                <span>秒</span>
+            </div>
+            <div id="alarm-list-inputs"></div>
+            <button class="btn btn-add" onclick="addAlarmRow()">+ アラームを追加</button>
+        </div>
+
+        <div class="countdown-panel" id="countdown-container"></div>
+    </div>
+
+    <div class="action-bar">
+        <button class="btn btn-utility" onclick="toggleLayout()">⇄ 左右レイアウト切替</button>
+        <button class="btn btn-utility" onclick="toggleInputMode()">🕒 時刻モード切替</button>
+    </div>
+
+    <div class="info-card">
+        <h2>つかいかた</h2>
+        <ul>
+            <li><strong>遅延:</strong> アラームの終了時刻を指定秒数ずらします。</li>
+            <li><strong>左右レイアウト切替:</strong> 設定とカウントダウンの配置を入れ替えます。</li>
+            <li><strong>時刻モード切替:</strong> 「時刻」形式と「分」形式を切り替えます。</li>
+        </ul>
+    </div>
+
+<script>
+    const triggered = new Set();
+    let alarmCount = 0;
+    let inputMode = 'minute'; // 'time' or 'minute'
+
+    function addAlarmRow(h = 21, m = 20) {
+        const id = `alarm-${Date.now()}-${alarmCount++}`;
+        const inputList = document.getElementById('alarm-list-inputs');
+        const row = document.createElement('div');
+        row.className = 'alarm-row';
+        row.id = `row-${id}`;
+        
+        renderRow(row, id, h, m);
+        inputList.appendChild(row);
+
+        const container = document.getElementById('countdown-container');
+        const card = document.createElement('div');
+        card.className = 'countdown-card';
+        card.id = `card-${id}`;
+        card.innerHTML = `<div class="card-info"><span class="display-time">--:--</span><span class="delay-val"></span></div><div class="card-timer">00:00:00</div>`;
+        container.appendChild(card);
+    }
+
+    function renderRow(row, id, h, m) {
+        if (inputMode === 'time') {
+            row.innerHTML = `
+                <input type="number" class="input-number h" value="${h}" min="0" max="23" style="width: 45px;">時
+                <input type="number" class="input-number m" value="${m}" min="0" max="59" style="width: 45px;">分
+                <button class="btn btn-del" onclick="removeAlarm('${id}')">削除</button>`;
+        } else {
+            row.innerHTML = `
+                <input type="number" class="input-number m-only" value="${m}" min="0" max="59" style="width: 55px;">分後に終了する砦です。
+                <button class="btn btn-del" onclick="removeAlarm('${id}')">削除</button>`;
+        }
+    }
+
+    function removeAlarm(id) {
+        document.getElementById(`row-${id}`).remove();
+        document.getElementById(`card-${id}`).remove();
+    }
+
+    function toggleLayout() {
+        document.getElementById('main-wrapper').classList.toggle('reverse');
+    }
+
+    function toggleInputMode() {
+        const rows = document.querySelectorAll('.alarm-row');
+        const prevMode = inputMode;
+        inputMode = (inputMode === 'time') ? 'minute' : 'time';
+
+        rows.forEach(row => {
+            const id = row.id.replace('row-', '');
+            let h = parseInt(row.querySelector('.h')?.value) || 21;
+            let m = parseInt(row.querySelector('.m')?.value || row.querySelector('.m-only')?.value) || 0;
+
+            if (prevMode === 'time' && inputMode === 'minute') {
+                // 時刻 → 分のみ：+1分
+                m++;
+                if (m >= 60) { m = 0; h = (h + 1) % 24; }
+            } else if (prevMode === 'minute' && inputMode === 'time') {
+                // 分のみ → 時刻：-1分
+                m--;
+                if (m < 0) { m = 59; h = (h - 1 < 0) ? 23 : h - 1; }
+            }
+
+            renderRow(row, id, h, m);
+        });
+    }
+
+    addAlarmRow(21, 20);
+    addAlarmRow(21, 40);
+
+    function update() {
+        const now = new Date();
+        const delaySec = parseInt(document.getElementById('global-delay').value) || 0;
+        document.getElementById('live-clock').innerText = now.toTimeString().split(' ')[0];
+
+        document.querySelectorAll('.alarm-row').forEach(row => {
+            const id = row.id.replace('row-', '');
+            const card = document.getElementById(`card-${id}`);
+            
+            let h, m;
+            if (inputMode === 'time') {
+                h = parseInt(row.querySelector('.h').value) || 0;
+                m = parseInt(row.querySelector('.m').value) || 0;
+            } else {
+                h = 21;
+                m = parseInt(row.querySelector('.m-only').value) || 0;
+            }
+
+            const targetDate = new Date();
+            targetDate.setHours(h, m, 0, 0);
+            targetDate.setSeconds(targetDate.getSeconds() + delaySec);
+
+            const diffMs = targetDate - now;
+            card.querySelector('.display-time').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+            card.querySelector('.delay-val').innerText = `(+${delaySec}s)`;
+
+            const timerEl = card.querySelector('.card-timer');
+            if (diffMs > 0) {
+                card.classList.remove('finished');
+                const sTotal = Math.floor(diffMs / 1000);
+                const hh = Math.floor(sTotal / 3600);
+                const mm = Math.floor((sTotal % 3600) / 60);
+                const ss = sTotal % 60;
+                timerEl.innerText = `${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
+            } else {
+                card.classList.add('finished');
+                timerEl.innerText = "00:00:00";
+            }
+
+            if (Math.floor(diffMs / 1000) === 0) {
+                const key = `${id}-${targetDate.getTime()}`;
+                if (!triggered.has(key)) {
+                    triggered.add(key);
+                }
+            }
+        });
+    }
+
+    setInterval(update, 1000);
+    update();
+</script>
+
+</body>
+</html>
