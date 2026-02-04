@@ -110,7 +110,7 @@
 
     <div class="action-bar">
         <button class="btn btn-utility" onclick="toggleLayout()">⇄ 左右レイアウト切替</button>
-        <button class="btn btn-utility" onclick="toggleInputMode()">🕒 時刻モード切替</button>
+        <button class="btn btn-utility" onclick="toggleInputMode()">🕒 タイマー切替</button>
     </div>
 
     <div class="info-card">
@@ -125,7 +125,7 @@
 <script>
     const triggered = new Set();
     let alarmCount = 0;
-    let inputMode = 'minute'; // 'time' or 'minute'
+    let inputMode = 'minute'; // 初期は分のみモード
 
     function addAlarmRow(h = 21, m = 20) {
         const id = `alarm-${Date.now()}-${alarmCount++}`;
@@ -159,8 +159,10 @@
     }
 
     function removeAlarm(id) {
-        document.getElementById(`row-${id}`).remove();
-        document.getElementById(`card-${id}`).remove();
+        const r = document.getElementById(`row-${id}`);
+        const c = document.getElementById(`card-${id}`);
+        if(r) r.remove();
+        if(c) c.remove();
     }
 
     function toggleLayout() {
@@ -178,19 +180,20 @@
             let m = parseInt(row.querySelector('.m')?.value || row.querySelector('.m-only')?.value) || 0;
 
             if (prevMode === 'time' && inputMode === 'minute') {
-                // 時刻 → 分のみ：+1分
-                m++;
-                if (m >= 60) { m = 0; h = (h + 1) % 24; }
-            } else if (prevMode === 'minute' && inputMode === 'time') {
-                // 分のみ → 時刻：-1分
+                // 時刻モード(21:21) → 分のみモード(20) : テキストから1引く
                 m--;
                 if (m < 0) { m = 59; h = (h - 1 < 0) ? 23 : h - 1; }
+            } else if (prevMode === 'minute' && inputMode === 'time') {
+                // 分のみモード(20) → 時刻モード(21:21) : テキストに1足す
+                m++;
+                if (m >= 60) { m = 0; h = (h + 1) % 24; }
             }
 
             renderRow(row, id, h, m);
         });
     }
 
+    // 初期データ (分のみモードなので「20」と入れると内部で21分として扱う)
     addAlarmRow(21, 20);
     addAlarmRow(21, 40);
 
@@ -202,14 +205,18 @@
         document.querySelectorAll('.alarm-row').forEach(row => {
             const id = row.id.replace('row-', '');
             const card = document.getElementById(`card-${id}`);
-            
+            if(!card) return;
+
             let h, m;
             if (inputMode === 'time') {
+                // 時刻モード：表示されている数値のまま計算
                 h = parseInt(row.querySelector('.h').value) || 0;
                 m = parseInt(row.querySelector('.m').value) || 0;
             } else {
+                // 分のみモード：表示されている数値(20)に +1分(21) して計算
                 h = 21;
-                m = parseInt(row.querySelector('.m-only').value) || 0;
+                m = (parseInt(row.querySelector('.m-only').value) || 0) + 1;
+                if (m >= 60) { m = 0; h = 22; }
             }
 
             const targetDate = new Date();
