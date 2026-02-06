@@ -11,8 +11,8 @@
             --finished-opacity: 0.7; --status-bg: rgba(0, 0, 0, 0.05);
             --status-color: #666; --warning-color: #ff5252; --warning-bg: rgba(255, 82, 82, 0.12);
             --delay-badge-bg: #444444; --delay-text: #ffffff;
-            /* 視認性の高い太字の等幅サンセリフフォント */
-            --font-mono: "SF Mono", "Roboto Mono", "Cascadia Code", "Segoe UI Mono", "Liberation Mono", "Menlo", "Monaco", "Consolas", monospace;
+            /* パターンB: テック感のある洗練された等幅フォント */
+            --font-mono: "JetBrains Mono", "Fira Code", "Input", "Menlo", "Consolas", monospace;
         }
         [data-theme="dark"] {
             --bg-color: #050505; --card-bg: #121212; --text-main: #ffffff;
@@ -23,7 +23,7 @@
 
         body {
             background-color: var(--bg-color); color: var(--text-main); margin: 0;
-            font-family: var(--font-mono); font-weight: 700; transition: background-color 0.4s ease;
+            font-family: var(--font-mono); font-weight: 800; transition: background-color 0.4s ease;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             min-height: 100vh; padding: 40px 20px; box-sizing: border-box;
         }
@@ -32,13 +32,13 @@
         header { width: 100%; padding-bottom: 30px; text-align: center; }
         .clock-container { display: flex; align-items: center; justify-content: center; gap: 15px; }
         
-        #current-time { font-size: 2.8rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-        .clock-label { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 8px; letter-spacing: 0.2em; font-weight: 800; }
+        #current-time { font-size: 2.8rem; font-weight: 900; line-height: 1; letter-spacing: -0.02em; }
+        .clock-label { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 8px; letter-spacing: 0.2em; }
 
         #delay-display {
             font-size: 1.1rem; background: var(--delay-badge-bg);
             padding: 5px 12px; border-radius: 20px; color: var(--delay-text);
-            font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.2); white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); white-space: nowrap;
         }
 
         #timer-container { display: flex; flex-direction: column; gap: 20px; width: 100%; }
@@ -58,7 +58,10 @@
 
         .timer-card.finished { background: var(--finished-bg); opacity: var(--finished-opacity); transform: scale(0.95); box-shadow: none; }
 
-        .display { font-size: 3.8rem; font-weight: 800; margin-bottom: 5px; line-height: 1; letter-spacing: -0.02em; }
+        .display { 
+            font-size: 4rem; font-weight: 900; margin-bottom: 5px; line-height: 1; 
+            letter-spacing: -0.05em; font-variant-numeric: tabular-nums; 
+        }
         .label { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.05em; margin: 8px 0 0 0; }
         .label:empty { display: none; }
 
@@ -70,7 +73,7 @@
         }
 
         .bottom-badge {
-            position: fixed; font-size: 0.85rem; font-weight: 800;
+            position: fixed; font-size: 0.85rem; font-weight: 900;
             padding: 10px 24px; border-radius: 25px; left: 50%; transform: translateX(-50%) translateY(20px);
             transition: all 0.5s ease; opacity: 0; pointer-events: none; z-index: 90;
         }
@@ -78,6 +81,9 @@
         
         #warning-area { bottom: 65px; color: var(--warning-color); background: var(--warning-bg); border: 1px solid rgba(255, 82, 82, 0.3); }
         #status-area { bottom: 15px; color: var(--status-color); background: var(--status-bg); border: 1px solid var(--card-border); }
+        
+        /* エラー時の特別スタイル */
+        .status-error { color: var(--warning-color) !important; border-color: var(--warning-color) !important; }
     </style>
 </head>
 <body>
@@ -115,10 +121,11 @@
             delaySeconds: 0
         };
 
-        const updateStatus = (text) => {
+        const updateStatus = (text, isError = false) => {
             const el = document.getElementById('status-area');
             el.textContent = text.toUpperCase();
             el.classList.add('show');
+            el.classList.toggle('status-error', isError);
         };
 
         async function fetchSheetData() {
@@ -160,12 +167,14 @@
                 updateStatus('updated');
             } catch (e) { 
                 console.error("Fetch Error:", e);
-                updateStatus('error');
+                updateStatus('api error', true);
             } finally {
-                // 成功・失敗に関わらず2秒後に waiting に戻す
                 setTimeout(() => {
                     const el = document.getElementById('status-area');
-                    if (el.textContent !== 'INITIALIZING') updateStatus('waiting');
+                    // エラー状態でない場合のみ waiting に戻す
+                    if (!el.classList.contains('status-error') && el.textContent !== 'INITIALIZING') {
+                        updateStatus('waiting');
+                    }
                 }, 2000);
             }
         }
@@ -246,13 +255,26 @@
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_RANGE)}?key=${CONFIG.API_KEY}`;
             try {
                 const res = await fetch(url);
+                if (!res.ok) {
+                    updateStatus('api error', true);
+                    return;
+                }
                 const data = await res.json();
                 const currentDataStr = JSON.stringify(data.values);
                 if (currentDataStr !== state.lastCheckData) {
                     state.lastCheckData = currentDataStr;
                     await fetchSheetData();
+                } else {
+                    // エラーから復帰した場合などに状態を戻す
+                    const el = document.getElementById('status-area');
+                    if (el.classList.contains('status-error')) {
+                        el.classList.remove('status-error');
+                        updateStatus('waiting');
+                    }
                 }
-            } catch (e) {}
+            } catch (e) {
+                updateStatus('api error', true);
+            }
         }
 
         function toggleTheme() {
