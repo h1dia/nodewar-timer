@@ -2,259 +2,271 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>拠点戦タイマー</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamlined Event Timer</title>
     <style>
         :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --accent: #38bdf8;
-            --text: #f8fafc;
-            --danger: #ef4444;
-            --success: #10b981;
-            --delay-color: #fbbf24;
-            --info-bg: #334155;
+            --bg-color: #f0f0f0; --card-bg: #ffffff; --text-main: #222222;
+            --text-sub: #888888; --card-border: #dddddd; --finished-bg: #e8e8e8;
+            --finished-opacity: 0.7; --status-bg: rgba(0, 0, 0, 0.05);
+            --status-color: #666; --warning-color: #ff5252; --warning-bg: rgba(255, 82, 82, 0.12);
+            --delay-badge-bg: #444444; --delay-text: #ffffff;
+        }
+        [data-theme="dark"] {
+            --bg-color: #050505; --card-bg: #121212; --text-main: #ffffff;
+            --text-sub: #444444; --card-border: #2a2a2a; --finished-bg: #1a1a1a;
+            --status-bg: rgba(255, 255, 255, 0.05);
+            --delay-badge-bg: #333333;
         }
 
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Consolas', 'Monaco', 'Meiryo', monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 40px 20px;
+            background-color: var(--bg-color); color: var(--text-main); margin: 0;
+            font-family: 'Courier New', Courier, monospace; transition: background-color 0.4s ease;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 40px 20px; box-sizing: border-box;
         }
 
-        h1 { color: var(--accent); margin-bottom: 30px; letter-spacing: 2px; }
+        .content-wrapper { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+        header { width: 100%; padding-bottom: 30px; text-align: center; }
+        .clock-container { display: flex; align-items: center; justify-content: center; gap: 15px; }
+        #current-time { font-size: 2.8rem; font-weight: bold; line-height: 1; }
+        .clock-label { font-size: 0.85rem; color: var(--text-sub); margin-bottom: 8px; letter-spacing: 0.3em; font-weight: bold; font-family: sans-serif; }
 
-        .wrapper {
-            display: flex;
-            gap: 30px;
-            max-width: 950px;
-            width: 100%;
-            margin-bottom: 20px;
-            transition: flex-direction 0.3s ease;
-        }
-        .wrapper.reverse { flex-direction: row-reverse; }
-
-        .settings-panel {
-            background: var(--card);
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            flex: 0 0 400px;
-            text-align: center;
+        #delay-display {
+            font-size: 1.1rem; font-family: inherit; background: var(--delay-badge-bg);
+            padding: 5px 12px; border-radius: 20px; color: var(--delay-text);
+            font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.2); white-space: nowrap;
         }
 
-        #live-clock { font-size: 4rem; font-weight: 800; color: var(--accent); margin-bottom: 1rem; }
-
-        .delay-section {
-            background: rgba(251, 191, 36, 0.1);
-            border: 1px solid var(--delay-color);
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 1.5rem;
-            display: flex; justify-content: center; align-items: center; gap: 10px;
+        #timer-container { display: flex; flex-direction: column; gap: 20px; width: 100%; }
+        
+        .timer-card {
+            background: var(--card-bg); padding: 35px 20px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); text-align: center;
+            border: 1px solid var(--card-border); width: 100%; box-sizing: border-box;
+            transition: opacity 0.6s ease, transform 0.6s ease, max-height 0.6s ease, margin 0.6s ease, padding 0.6s ease;
+            max-height: 500px; overflow: hidden;
         }
 
-        .input-number {
-            background: #334155; border: 1px solid #475569; color: white;
-            padding: 5px; border-radius: 4px; text-align: center;
+        .timer-card.hidden {
+            opacity: 0; max-height: 0; margin-top: -10px; margin-bottom: -10px;
+            padding-top: 0; padding-bottom: 0; border-width: 0; pointer-events: none;
         }
 
-        .alarm-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: center; justify-content: center; }
+        .timer-card.finished { background: var(--finished-bg); opacity: var(--finished-opacity); transform: scale(0.95); box-shadow: none; }
 
-        .countdown-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-        .countdown-card {
-            background: var(--card); padding: 15px 25px; border-radius: 12px;
-            display: flex; justify-content: space-between; align-items: center;
-            border-left: 4px solid var(--accent);
-        }
-        .countdown-card.finished { border-left-color: #475569; opacity: 0.5; }
-        .card-timer { font-size: 1.6rem; color: var(--delay-color); }
+        .display { font-size: 3.8rem; font-weight: bold; margin-bottom: 5px; line-height: 1; }
+        .label { font-size: 1.1rem; font-weight: bold; letter-spacing: 0.1em; margin: 5px 0 0 0; font-family: sans-serif; }
+        .label:empty { display: none; }
 
-        .action-bar {
-            max-width: 950px; width: 100%;
-            display: flex; gap: 10px; margin-bottom: 20px;
+        .theme-toggle {
+            position: fixed; top: 20px; right: 20px; width: 45px; height: 45px;
+            cursor: pointer; background: var(--card-bg); color: var(--text-main);
+            border: 1px solid var(--card-border); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; z-index: 110;
         }
 
-        .btn { cursor: pointer; border: none; border-radius: 5px; padding: 10px 15px; font-weight: bold; transition: 0.2s; }
-        .btn-utility { background: #64748b; color: white; flex: 1; }
-        .btn-add { background: var(--success); color: white; width: 100%; margin-top: 10px; }
-        .btn-del { background: var(--danger); color: white; }
-
-        .info-card {
-            max-width: 950px; width: 100%; background: var(--info-bg);
-            padding: 1.5rem 2rem; border-radius: 15px; line-height: 1.6;
+        /* Bottom Badges */
+        .bottom-badge {
+            position: fixed; font-family: sans-serif; font-size: 0.85rem; font-weight: bold;
+            padding: 10px 24px; border-radius: 25px; left: 50%; transform: translateX(-50%) translateY(20px);
+            transition: all 0.5s ease; opacity: 0; pointer-events: none; z-index: 90;
         }
-        .info-card h2 { margin-top: 0; font-size: 1.2rem; color: var(--accent); }
+        .bottom-badge.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+        
+        #warning-area { bottom: 65px; color: var(--warning-color); background: var(--warning-bg); border: 1px solid rgba(255, 82, 82, 0.3); }
+        #status-area { bottom: 15px; color: var(--status-color); background: var(--status-bg); border: 1px solid var(--card-border); }
     </style>
 </head>
 <body>
-    <div class="wrapper" id="main-wrapper">
-        <div class="settings-panel">
-            <div id="live-clock">00:00:00</div>
-            <div class="delay-section">
-                <label>遅延:</label>
-                <input type="number" id="global-delay" class="input-number" value="0" min="0" style="width: 60px;">
-                <span>秒</span>
+
+    <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">☀️</button>
+
+    <div class="content-wrapper">
+        <header>
+            <div class="clock-label">現在時刻</div>
+            <div class="clock-container">
+                <div id="current-time">--:--:--</div>
+                <div id="delay-display">+0s</div>
             </div>
-            <div id="alarm-list-inputs"></div>
-            <button class="btn btn-add" onclick="addAlarmRow()">+ アラームを追加</button>
-        </div>
-
-        <div class="countdown-panel" id="countdown-container"></div>
+        </header>
+        <div id="timer-container"></div>
     </div>
 
-    <div class="action-bar">
-        <button class="btn btn-utility" onclick="toggleLayout()">⇄ 左右レイアウト切替</button>
-        <button class="btn btn-utility" onclick="toggleInputMode()">🕒 タイマー切替</button>
-    </div>
+    <div id="warning-area" class="bottom-badge">⚠️ 設定時刻は古い可能性があります</div>
+    <div id="status-area" class="bottom-badge show">INITIALIZING...</div>
 
-    <div class="info-card">
-        <h2>つかいかた</h2>
-        <ul>
-            <li><strong>遅延:</strong> アラームの終了時刻を指定秒数ずらします。</li>
-            <li><strong>左右レイアウト切替:</strong> 設定とカウントダウンの配置を入れ替えます。</li>
-            <li><strong>時刻モード切替:</strong> 「時刻」形式と「分」形式を切り替えます。<br>(開始直後に表示された砦の時間を入力するといい感じになります)</li>
-        </ul>
-    </div>
+    <script>
+        const CONFIG = {
+            SHEET_ID: '16A_C49u3ld7n0hwqJgg503riWGBhl5UkzLT0yesYLeQ',
+            API_KEY: 'AIzaSyCStsG2mbAtAruv-WN_d8hVWd0n-7QAUKc',
+            RANGE: 'シート1!A1:B20',
+            CHECK_CELL: 'シート1!B2',
+            BASE_HOUR: 21,
+            POLL_INTERVAL: 15000
+        };
 
-<script>
-    const triggered = new Set();
-    let alarmCount = 0;
-    let inputMode = 'minute'; // 初期は分のみモード
+        let state = {
+            timerData: [],
+            serverOffset: 0,
+            lastUpdateStamp: null,
+            delaySeconds: 0
+        };
 
-    function addAlarmRow(h = 21, m = 20) {
-        const id = `alarm-${Date.now()}-${alarmCount++}`;
-        const inputList = document.getElementById('alarm-list-inputs');
-        const row = document.createElement('div');
-        row.className = 'alarm-row';
-        row.id = `row-${id}`;
-        
-        renderRow(row, id, h, m);
-        inputList.appendChild(row);
+        const updateStatus = (text) => {
+            const el = document.getElementById('status-area');
+            el.textContent = text.toUpperCase();
+            el.classList.add('show');
+        };
 
-        const container = document.getElementById('countdown-container');
-        const card = document.createElement('div');
-        card.className = 'countdown-card';
-        card.id = `card-${id}`;
-        card.innerHTML = `<div class="card-info"><span class="display-time">--:--</span><span class="delay-val"></span></div><div class="card-timer">00:00:00</div>`;
-        container.appendChild(card);
-    }
+        async function fetchSheetData() {
+            updateStatus('syncing...');
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.RANGE)}?key=${CONFIG.API_KEY}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (!data.values) return;
 
-    function renderRow(row, id, h, m) {
-        if (inputMode === 'time') {
-            row.innerHTML = `
-                <input type="number" class="input-number h" value="${h}" min="0" max="23" style="width: 45px;">時
-                <input type="number" class="input-number m" value="${m}" min="0" max="59" style="width: 45px;">分
-                <button class="btn btn-del" onclick="removeAlarm('${id}')">削除</button>`;
-        } else {
-            row.innerHTML = `
-                <input type="number" class="input-number m-only" value="${m}" min="0" max="59" style="width: 55px;">分後に終了する砦です。
-                <button class="btn btn-del" onclick="removeAlarm('${id}')">削除</button>`;
-        }
-    }
+                // 警告表示（A2セル）
+                const a2Val = data.values[1]?.[0];
+                document.getElementById('warning-area').classList.toggle('show', !!(a2Val && a2Val.trim()));
 
-    function removeAlarm(id) {
-        const r = document.getElementById(`row-${id}`);
-        const c = document.getElementById(`card-${id}`);
-        if(r) r.remove();
-        if(c) c.remove();
-    }
+                // 遅延表示（B1セル）
+                const b1Val = data.values[0]?.[1] || "0";
+                state.delaySeconds = parseInt(b1Val, 10) || 0;
+                document.getElementById('delay-display').textContent = `+${state.delaySeconds}s`;
 
-    function toggleLayout() {
-        document.getElementById('main-wrapper').classList.toggle('reverse');
-    }
+                const now = new Date(Date.now() + state.serverOffset);
+                let processed = [];
 
-    function toggleInputMode() {
-        const rows = document.querySelectorAll('.alarm-row');
-        const prevMode = inputMode;
-        inputMode = (inputMode === 'time') ? 'minute' : 'time';
-
-        rows.forEach(row => {
-            const id = row.id.replace('row-', '');
-            let h = parseInt(row.querySelector('.h')?.value) || 21;
-            let m = parseInt(row.querySelector('.m')?.value || row.querySelector('.m-only')?.value) || 0;
-
-            if (prevMode === 'time' && inputMode === 'minute') {
-                // 時刻モード(21:21) → 分のみモード(20) : テキストから1引く
-                m--;
-                if (m < 0) { m = 59; h = (h - 1 < 0) ? 23 : h - 1; }
-            } else if (prevMode === 'minute' && inputMode === 'time') {
-                // 分のみモード(20) → 時刻モード(21:21) : テキストに1足す
-                m++;
-                if (m >= 60) { m = 0; h = (h + 1) % 24; }
-            }
-
-            renderRow(row, id, h, m);
-        });
-    }
-
-    // 初期データ (分のみモードなので「20」と入れると内部で21分として扱う)
-    addAlarmRow(21, 20);
-    addAlarmRow(21, 40);
-
-    function update() {
-        const now = new Date();
-        const delaySec = parseInt(document.getElementById('global-delay').value) || 0;
-        document.getElementById('live-clock').innerText = now.toTimeString().split(' ')[0];
-
-        document.querySelectorAll('.alarm-row').forEach(row => {
-            const id = row.id.replace('row-', '');
-            const card = document.getElementById(`card-${id}`);
-            if(!card) return;
-
-            let h, m;
-            if (inputMode === 'time') {
-                // 時刻モード：表示されている数値のまま計算
-                h = parseInt(row.querySelector('.h').value) || 0;
-                m = parseInt(row.querySelector('.m').value) || 0;
-            } else {
-                // 分のみモード：表示されている数値(20)に +1分(21) して計算
-                h = 21;
-                m = (parseInt(row.querySelector('.m-only').value) || 0) + 1;
-                if (m >= 60) { m = 0; h = 22; }
-            }
-
-            const targetDate = new Date();
-            targetDate.setHours(h, m, 0, 0);
-            targetDate.setSeconds(targetDate.getSeconds() + delaySec);
-
-            const diffMs = targetDate - now;
-            card.querySelector('.display-time').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-            card.querySelector('.delay-val').innerText = `(+${delaySec}s)`;
-
-            const timerEl = card.querySelector('.card-timer');
-            if (diffMs > 0) {
-                card.classList.remove('finished');
-                const sTotal = Math.floor(diffMs / 1000);
-                const hh = Math.floor(sTotal / 3600);
-                const mm = Math.floor((sTotal % 3600) / 60);
-                const ss = sTotal % 60;
-                timerEl.innerText = `${hh.toString().padStart(2,'0')}:${mm.toString().padStart(2,'0')}:${ss.toString().padStart(2,'0')}`;
-            } else {
-                card.classList.add('finished');
-                timerEl.innerText = "00:00:00";
-            }
-
-            if (Math.floor(diffMs / 1000) === 0) {
-                const key = `${id}-${targetDate.getTime()}`;
-                if (!triggered.has(key)) {
-                    triggered.add(key);
+                // 1. "開始まで" タイマー
+                const startTarget = getTargetTime(CONFIG.BASE_HOUR, 0);
+                if (startTarget > now) {
+                    processed.push({ label: "開始まで", targetDate: startTarget, type: "start", isFinished: false });
                 }
+
+                // 2. 通常タイマー
+                data.values.slice(3).forEach(row => {
+                    const minute = parseInt(row[1], 10);
+                    if (isNaN(minute)) return;
+                    const label = row[0] ? row[0].trim() : "";
+                    const target = getTargetTime(CONFIG.BASE_HOUR, minute + 1);
+                    processed.push({ label: label, targetDate: target, type: "normal", isFinished: target <= now });
+                });
+
+                renderTimers(processed);
+                updateStatus('updated');
+                setTimeout(() => updateStatus('waiting'), 2000);
+            } catch (e) { 
+                console.error("Fetch Error:", e);
+                updateStatus('error');
             }
-        });
-    }
+        }
 
-    setInterval(update, 1000);
-    update();
-</script>
+        function getTargetTime(hour, minute) {
+            const t = new Date(Date.now() + state.serverOffset);
+            t.setHours(hour, minute, 0, 0);
+            t.setSeconds(t.getSeconds() + state.delaySeconds);
+            return t;
+        }
 
+        function renderTimers(data) {
+            data.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
+            const container = document.getElementById('timer-container');
+            container.innerHTML = '';
+            
+            state.timerData = data.map((item, i) => {
+                const id = `timer-${i}`;
+                const card = document.createElement('div');
+                card.id = `card-${id}`;
+                card.className = `timer-card ${item.isFinished ? 'finished' : ''}`;
+                card.innerHTML = `<div id="${id}" class="display">--:--:--</div><p class="label">${item.label}</p>`;
+                container.appendChild(card);
+                return { ...item, id };
+            });
+        }
+
+        function updateDisplay() {
+            const now = new Date(Date.now() + state.serverOffset);
+            document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
+
+            let needsReorder = false;
+            state.timerData.forEach(item => {
+                if (item.isFinished) return;
+                const diff = item.targetDate - now;
+
+                if (diff <= 0) {
+                    item.isFinished = true;
+                    const card = document.getElementById(`card-${item.id}`);
+                    if (item.type === "start") {
+                        card.classList.add('hidden');
+                        setTimeout(() => {
+                            card.remove();
+                            state.timerData = state.timerData.filter(t => t.id !== item.id);
+                        }, 600);
+                    } else {
+                        card.classList.add('finished');
+                        document.getElementById(item.id).textContent = "00:00:00";
+                        needsReorder = true;
+                    }
+                } else {
+                    const s = Math.ceil(diff / 1000);
+                    const hms = [Math.floor(s/3600), Math.floor((s%3600)/60), s%60];
+                    document.getElementById(item.id).textContent = hms.map(v => String(v).padStart(2,'0')).join(':');
+                }
+            });
+            if (needsReorder) reorderCards();
+        }
+
+        function reorderCards() {
+            const container = document.getElementById('timer-container');
+            [...container.children]
+                .filter(c => !c.classList.contains('hidden'))
+                .sort((a, b) => a.classList.contains('finished') - b.classList.contains('finished'))
+                .forEach(c => container.appendChild(c));
+        }
+
+        async function syncServerTime() {
+            try {
+                const res = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=Asia/Tokyo');
+                const data = await res.json();
+                state.serverOffset = new Date(data.dateTime).getTime() - Date.now();
+            } catch (e) { state.serverOffset = 0; }
+        }
+
+        async function watchUpdate() {
+            if (document.hidden) return;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_CELL)}?key=${CONFIG.API_KEY}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const stamp = data.values?.[0]?.[0];
+                if (stamp && state.lastUpdateStamp !== stamp) {
+                    state.lastUpdateStamp = stamp;
+                    await fetchSheetData();
+                }
+            } catch (e) {}
+        }
+
+        function toggleTheme() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            const theme = isDark ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        async function init() {
+            const theme = localStorage.getItem('theme') || 'dark';
+            document.body.setAttribute('data-theme', theme);
+            document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
+            await syncServerTime();
+            await fetchSheetData();
+            setInterval(updateDisplay, 100);
+            setInterval(watchUpdate, CONFIG.POLL_INTERVAL);
+        }
+
+        init();
+    </script>
 </body>
 </html>
-
-
-
