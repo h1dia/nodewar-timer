@@ -100,7 +100,7 @@
             RANGE: 'シート1!A1:B20',
             CHECK_RANGE: 'シート1!A2:B2',
             BASE_HOUR: 21,
-            POLL_INTERVAL: 30000 // 安定のため30秒に変更
+            POLL_INTERVAL: 60000 // 安定のため1分に1回
         };
 
         let state = { timerData: [], serverOffset: 0, lastCheckData: "", delaySeconds: 0 };
@@ -182,7 +182,8 @@
 
         function updateDisplay() {
             const now = new Date(Date.now() + state.serverOffset);
-            document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
+            const timeStr = now.toTimeString().split(' ')[0];
+            document.getElementById('current-time').textContent = timeStr;
 
             let needsReorder = false;
             state.timerData.forEach(item => {
@@ -224,13 +225,23 @@
         }
 
         async function watchUpdate() {
+            // タブが隠れている時はリクエストしない（節約）
             if (document.hidden) return;
+
+            // 複数人アクセス時の同時リクエストを避けるため0-3秒のランダム遅延
+            await new Promise(r => setTimeout(r, Math.random() * 3000));
+
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_RANGE)}?key=${CONFIG.API_KEY}`;
             try {
                 const res = await fetch(url);
+                if (res.status === 429) {
+                    updateStatus('rate limit', true);
+                    return;
+                }
                 if (!res.ok) throw new Error("Check failed");
                 const data = await res.json();
                 const currentDataStr = JSON.stringify(data.values);
+                
                 if (currentDataStr !== state.lastCheckData) {
                     state.lastCheckData = currentDataStr;
                     await fetchSheetData();
@@ -242,8 +253,7 @@
                     }
                 }
             } catch (e) {
-                console.warn("Retrying next cycle...");
-                // エラーになっても止まらず、次のインターバルで再試行される
+                console.warn("API Error - Retrying next cycle...");
             }
         }
 
