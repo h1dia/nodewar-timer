@@ -75,7 +75,6 @@
         #status-area { bottom: 15px; color: var(--status-color); background: var(--status-bg); border: 1px solid var(--card-border); }
         .status-error { color: var(--warning-color) !important; border-color: var(--warning-color) !important; }
         
-        /* カウントダウン表示用のスタイル */
         #update-countdown { opacity: 0.6; font-size: 0.75rem; border-left: 1px solid var(--status-color); padding-left: 10px; }
     </style>
 </head>
@@ -107,7 +106,7 @@
             RANGE: 'シート1!A1:B20',
             CHECK_RANGE: 'シート1!A2:B2',
             BASE_HOUR: 21,
-            POLL_INTERVAL: 60000 
+            POLL_INTERVAL: 15000 // 15秒間隔に設定
         };
 
         let state = { 
@@ -196,10 +195,8 @@
 
         function updateDisplay() {
             const now = new Date(Date.now() + state.serverOffset);
-            const timeStr = now.toTimeString().split(' ')[0];
-            document.getElementById('current-time').textContent = timeStr;
+            document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
 
-            // 次回更新までの秒数を計算して表示
             const nextSec = Math.max(0, Math.ceil((state.nextUpdateTimestamp - Date.now()) / 1000));
             document.getElementById('update-countdown').textContent = document.hidden ? "PAUSED" : `NEXT: ${nextSec}S`;
 
@@ -249,13 +246,15 @@
                 return;
             }
 
-            await new Promise(r => setTimeout(r, Math.random() * 2000));
+            // 同時リクエスト回避のランダム遅延
+            await new Promise(r => setTimeout(r, Math.random() * 1500));
 
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_RANGE)}?key=${CONFIG.API_KEY}`;
             try {
                 const res = await fetch(url);
-                if (res.status === 429) { updateStatus('rate limit', true); }
-                else if (res.ok) {
+                if (res.status === 429) {
+                    updateStatus('rate limit', true);
+                } else if (res.ok) {
                     const data = await res.json();
                     const currentDataStr = JSON.stringify(data.values);
                     if (currentDataStr !== state.lastCheckData) {
@@ -269,7 +268,9 @@
                         }
                     }
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.warn("API temporarily unavailable");
+            }
             scheduleNext();
         }
 
@@ -301,3 +302,4 @@
         init();
     </script>
 </body>
+</html>
