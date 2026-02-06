@@ -66,7 +66,6 @@
             display: flex; justify-content: center; align-items: center; z-index: 110;
         }
 
-        /* Bottom Badges */
         .bottom-badge {
             position: fixed; font-family: sans-serif; font-size: 0.85rem; font-weight: bold;
             padding: 10px 24px; border-radius: 25px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -101,7 +100,7 @@
             SHEET_ID: '16A_C49u3ld7n0hwqJgg503riWGBhl5UkzLT0yesYLeQ',
             API_KEY: 'AIzaSyCStsG2mbAtAruv-WN_d8hVWd0n-7QAUKc',
             RANGE: 'シート1!A1:B20',
-            CHECK_CELL: 'シート1!B2',
+            CHECK_RANGE: 'シート1!A2:B2',
             BASE_HOUR: 21,
             POLL_INTERVAL: 15000
         };
@@ -109,7 +108,7 @@
         let state = {
             timerData: [],
             serverOffset: 0,
-            lastUpdateStamp: null,
+            lastCheckData: "",
             delaySeconds: 0
         };
 
@@ -127,11 +126,10 @@
                 const data = await response.json();
                 if (!data.values) return;
 
-                // 警告表示（A2セル）
                 const a2Val = data.values[1]?.[0];
-                document.getElementById('warning-area').classList.toggle('show', !!(a2Val && a2Val.trim()));
+                const hasWarning = !!(a2Val && a2Val.trim());
+                document.getElementById('warning-area').classList.toggle('show', hasWarning);
 
-                // 遅延表示（B1セル）
                 const b1Val = data.values[0]?.[1] || "0";
                 state.delaySeconds = parseInt(b1Val, 10) || 0;
                 document.getElementById('delay-display').textContent = `+${state.delaySeconds}s`;
@@ -139,13 +137,11 @@
                 const now = new Date(Date.now() + state.serverOffset);
                 let processed = [];
 
-                // 1. "開始まで" タイマー
                 const startTarget = getTargetTime(CONFIG.BASE_HOUR, 0);
                 if (startTarget > now) {
                     processed.push({ label: "開始まで", targetDate: startTarget, type: "start", isFinished: false });
                 }
 
-                // 2. 通常タイマー
                 data.values.slice(3).forEach(row => {
                     const minute = parseInt(row[1], 10);
                     if (isNaN(minute)) return;
@@ -236,13 +232,13 @@
 
         async function watchUpdate() {
             if (document.hidden) return;
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_CELL)}?key=${CONFIG.API_KEY}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_RANGE)}?key=${CONFIG.API_KEY}`;
             try {
                 const res = await fetch(url);
                 const data = await res.json();
-                const stamp = data.values?.[0]?.[0];
-                if (stamp && state.lastUpdateStamp !== stamp) {
-                    state.lastUpdateStamp = stamp;
+                const currentDataStr = JSON.stringify(data.values);
+                if (currentDataStr !== state.lastCheckData) {
+                    state.lastCheckData = currentDataStr;
                     await fetchSheetData();
                 }
             } catch (e) {}
@@ -270,4 +266,3 @@
     </script>
 </body>
 </html>
-
