@@ -67,12 +67,16 @@
             position: fixed; font-size: 0.85rem; font-weight: 900;
             padding: 10px 24px; border-radius: 25px; left: 50%; transform: translateX(-50%) translateY(20px);
             transition: all 0.5s ease; opacity: 0; pointer-events: none; z-index: 90;
+            display: flex; gap: 10px; align-items: center;
         }
         .bottom-badge.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         
         #warning-area { bottom: 65px; color: var(--warning-color); background: var(--warning-bg); border: 1px solid rgba(255, 82, 82, 0.3); }
         #status-area { bottom: 15px; color: var(--status-color); background: var(--status-bg); border: 1px solid var(--card-border); }
         .status-error { color: var(--warning-color) !important; border-color: var(--warning-color) !important; }
+        
+        /* カウントダウン表示用のスタイル */
+        #update-countdown { opacity: 0.6; font-size: 0.75rem; border-left: 1px solid var(--status-color); padding-left: 10px; }
     </style>
 </head>
 <body>
@@ -91,7 +95,10 @@
     </div>
 
     <div id="warning-area" class="bottom-badge">⚠️ 設定時刻は古い可能性があります</div>
-    <div id="status-area" class="bottom-badge show">INITIALIZING...</div>
+    <div id="status-area" class="bottom-badge show">
+        <span id="status-text">INITIALIZING...</span>
+        <span id="update-countdown">NEXT: --S</span>
+    </div>
 
     <script>
         const CONFIG = {
@@ -100,15 +107,22 @@
             RANGE: 'シート1!A1:B20',
             CHECK_RANGE: 'シート1!A2:B2',
             BASE_HOUR: 21,
-            POLL_INTERVAL: 60000 // 安定のため1分に1回
+            POLL_INTERVAL: 60000 
         };
 
-        let state = { timerData: [], serverOffset: 0, lastCheckData: "", delaySeconds: 0 };
+        let state = { 
+            timerData: [], 
+            serverOffset: 0, 
+            lastCheckData: "", 
+            delaySeconds: 0,
+            nextUpdateTimestamp: 0 
+        };
 
         const updateStatus = (text, isError = false) => {
             const el = document.getElementById('status-area');
-            if (!el) return;
-            el.textContent = text.toUpperCase();
+            const txtEl = document.getElementById('status-text');
+            if (!el || !txtEl) return;
+            txtEl.textContent = text.toUpperCase();
             el.classList.add('show');
             el.classList.toggle('status-error', isError);
         };
@@ -185,6 +199,10 @@
             const timeStr = now.toTimeString().split(' ')[0];
             document.getElementById('current-time').textContent = timeStr;
 
+            // 次回更新までの秒数を計算して表示
+            const nextSec = Math.max(0, Math.ceil((state.nextUpdateTimestamp - Date.now()) / 1000));
+            document.getElementById('update-countdown').textContent = document.hidden ? "PAUSED" : `NEXT: ${nextSec}S`;
+
             let needsReorder = false;
             state.timerData.forEach(item => {
                 if (item.isFinished) return;
@@ -211,6 +229,7 @@
 
         function reorderCards() {
             const container = document.getElementById('timer-container');
+            if (!container) return;
             [...container.children]
                 .sort((a, b) => a.classList.contains('finished') - b.classList.contains('finished'))
                 .forEach(c => container.appendChild(c));
@@ -225,36 +244,38 @@
         }
 
         async function watchUpdate() {
-            // タブが隠れている時はリクエストしない（節約）
-            if (document.hidden) return;
+            if (document.hidden) {
+                scheduleNext();
+                return;
+            }
 
-            // 複数人アクセス時の同時リクエストを避けるため0-3秒のランダム遅延
-            await new Promise(r => setTimeout(r, Math.random() * 3000));
+            await new Promise(r => setTimeout(r, Math.random() * 2000));
 
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_RANGE)}?key=${CONFIG.API_KEY}`;
             try {
                 const res = await fetch(url);
-                if (res.status === 429) {
-                    updateStatus('rate limit', true);
-                    return;
-                }
-                if (!res.ok) throw new Error("Check failed");
-                const data = await res.json();
-                const currentDataStr = JSON.stringify(data.values);
-                
-                if (currentDataStr !== state.lastCheckData) {
-                    state.lastCheckData = currentDataStr;
-                    await fetchSheetData();
-                } else {
-                    const el = document.getElementById('status-area');
-                    if (el.classList.contains('status-error')) {
-                        el.classList.remove('status-error');
-                        updateStatus('waiting');
+                if (res.status === 429) { updateStatus('rate limit', true); }
+                else if (res.ok) {
+                    const data = await res.json();
+                    const currentDataStr = JSON.stringify(data.values);
+                    if (currentDataStr !== state.lastCheckData) {
+                        state.lastCheckData = currentDataStr;
+                        await fetchSheetData();
+                    } else {
+                        const el = document.getElementById('status-area');
+                        if (el && el.classList.contains('status-error')) {
+                            el.classList.remove('status-error');
+                            updateStatus('waiting');
+                        }
                     }
                 }
-            } catch (e) {
-                console.warn("API Error - Retrying next cycle...");
-            }
+            } catch (e) {}
+            scheduleNext();
+        }
+
+        function scheduleNext() {
+            state.nextUpdateTimestamp = Date.now() + CONFIG.POLL_INTERVAL;
+            setTimeout(watchUpdate, CONFIG.POLL_INTERVAL);
         }
 
         function toggleTheme() {
@@ -271,11 +292,12 @@
             document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
             await syncServerTime();
             await fetchSheetData();
+            
+            state.nextUpdateTimestamp = Date.now() + CONFIG.POLL_INTERVAL;
             setInterval(updateDisplay, 100);
-            setInterval(watchUpdate, CONFIG.POLL_INTERVAL);
+            setTimeout(watchUpdate, CONFIG.POLL_INTERVAL);
         }
 
         init();
     </script>
 </body>
-</html>
