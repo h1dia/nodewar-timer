@@ -3,7 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
     <title>拠点戦くん</title>
+    <meta name="description" content="砦のカウントダウンをします">
+    <meta property="og:title" content="拠点戦くん">
+    <meta property="og:description" content="砦のカウントダウンをします">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://h1dia.github.io/nodewar-timer/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="拠点戦くん">
+    <meta name="twitter:description" content="砦のカウントダウンをします">
+
     <style>
         :root {
             --bg-color: #f0f0f0; --card-bg: #ffffff; --text-main: #222222;
@@ -100,13 +110,12 @@
     </div>
 
     <script>
-        // 設定値の難読化
-        const _p1 = "AIzaSyCStsG2mbAt";
-        const _p2 = "Aruv-WN_d8hVWd0n-7QAUKc";
+        const _v1 = "AIzaSyCStsG2mbAt";
+        const _v2 = "Aruv-WN_d8hVWd0n-7QAUKc";
         
         const CONFIG = {
             SID: '16A_C49u3ld7n0hwqJgg503riWGBhl5UkzLT0yesYLeQ',
-            TID: _p1 + _p2, // 変数名を TID (Token ID) に変更し、分割結合
+            TID: _v1 + _v2, 
             RG: 'シート1!A1:B20',
             CRG: 'シート1!A2:B2',
             BH: 21,
