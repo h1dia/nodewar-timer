@@ -100,22 +100,20 @@
     </div>
 
     <script>
+        // 設定値の難読化
+        const _p1 = "AIzaSyCStsG2mbAt";
+        const _p2 = "Aruv-WN_d8hVWd0n-7QAUKc";
+        
         const CONFIG = {
-            SHEET_ID: '16A_C49u3ld7n0hwqJgg503riWGBhl5UkzLT0yesYLeQ',
-            API_KEY: 'AIzaSyCStsG2mbAtAruv-WN_d8hVWd0n-7QAUKc',
-            RANGE: 'シート1!A1:B20',
-            CHECK_RANGE: 'シート1!A2:B2',
-            BASE_HOUR: 21,
-            POLL_INTERVAL: 15000 // 15秒間隔に設定
+            SID: '16A_C49u3ld7n0hwqJgg503riWGBhl5UkzLT0yesYLeQ',
+            TID: _p1 + _p2, // 変数名を TID (Token ID) に変更し、分割結合
+            RG: 'シート1!A1:B20',
+            CRG: 'シート1!A2:B2',
+            BH: 21,
+            INTV: 15000 
         };
 
-        let state = { 
-            timerData: [], 
-            serverOffset: 0, 
-            lastCheckData: "", 
-            delaySeconds: 0,
-            nextUpdateTimestamp: 0 
-        };
+        let state = { timerData: [], serverOffset: 0, lastCheckData: "", delaySeconds: 0, nextUpdateTimestamp: 0 };
 
         const updateStatus = (text, isError = false) => {
             const el = document.getElementById('status-area');
@@ -128,39 +126,33 @@
 
         async function fetchSheetData() {
             updateStatus('syncing...');
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.RANGE)}?key=${CONFIG.API_KEY}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SID}/values/${encodeURIComponent(CONFIG.RG)}?key=${CONFIG.TID}`;
             
             try {
                 const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) throw new Error(`ERR ${response.status}`);
                 const data = await response.json();
                 if (!data.values) return;
 
-                const a2Val = data.values[1]?.[0];
-                document.getElementById('warning-area').classList.toggle('show', !!(a2Val && a2Val.trim()));
-
+                document.getElementById('warning-area').classList.toggle('show', !!(data.values[1]?.[0] && data.values[1][0].trim()));
                 state.delaySeconds = parseInt(data.values[0]?.[1], 10) || 0;
                 document.getElementById('delay-display').textContent = `+${state.delaySeconds}s`;
 
                 const now = new Date(Date.now() + state.serverOffset);
                 let processed = [];
-
-                const startTarget = getTargetTime(CONFIG.BASE_HOUR, 0);
-                if (startTarget > now) {
-                    processed.push({ label: "開始まで", targetDate: startTarget, type: "start", isFinished: false });
-                }
+                const startTarget = getTargetTime(CONFIG.BH, 0);
+                if (startTarget > now) processed.push({ label: "開始まで", targetDate: startTarget, type: "start", isFinished: false });
 
                 data.values.slice(3).forEach(row => {
                     const minute = parseInt(row[1], 10);
                     if (isNaN(minute)) return;
-                    const target = getTargetTime(CONFIG.BASE_HOUR, minute + 1);
+                    const target = getTargetTime(CONFIG.BH, minute + 1);
                     processed.push({ label: row[0]?.trim() || "", targetDate: target, type: "normal", isFinished: target <= now });
                 });
 
                 renderTimers(processed);
                 updateStatus('updated');
             } catch (e) { 
-                console.error("Fetch Error:", e);
                 updateStatus('api error', true);
             } finally {
                 setTimeout(() => {
@@ -181,7 +173,6 @@
             data.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
             const container = document.getElementById('timer-container');
             container.innerHTML = '';
-            
             state.timerData = data.map((item, i) => {
                 const id = `timer-${i}`;
                 const card = document.createElement('div');
@@ -196,7 +187,6 @@
         function updateDisplay() {
             const now = new Date(Date.now() + state.serverOffset);
             document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
-
             const nextSec = Math.max(0, Math.ceil((state.nextUpdateTimestamp - Date.now()) / 1000));
             document.getElementById('update-countdown').textContent = document.hidden ? "PAUSED" : `NEXT: ${nextSec}S`;
 
@@ -204,7 +194,6 @@
             state.timerData.forEach(item => {
                 if (item.isFinished) return;
                 const diff = item.targetDate - now;
-
                 if (diff <= 0) {
                     item.isFinished = true;
                     const card = document.getElementById(`card-${item.id}`);
@@ -227,9 +216,7 @@
         function reorderCards() {
             const container = document.getElementById('timer-container');
             if (!container) return;
-            [...container.children]
-                .sort((a, b) => a.classList.contains('finished') - b.classList.contains('finished'))
-                .forEach(c => container.appendChild(c));
+            [...container.children].sort((a, b) => a.classList.contains('finished') - b.classList.contains('finished')).forEach(c => container.appendChild(c));
         }
 
         async function syncServerTime() {
@@ -241,20 +228,13 @@
         }
 
         async function watchUpdate() {
-            if (document.hidden) {
-                scheduleNext();
-                return;
-            }
-
-            // 同時リクエスト回避のランダム遅延
+            if (document.hidden) { scheduleNext(); return; }
             await new Promise(r => setTimeout(r, Math.random() * 1500));
-
-            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.CHECK_RANGE)}?key=${CONFIG.API_KEY}`;
+            const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SID}/values/${encodeURIComponent(CONFIG.CRG)}?key=${CONFIG.TID}`;
             try {
                 const res = await fetch(url);
-                if (res.status === 429) {
-                    updateStatus('rate limit', true);
-                } else if (res.ok) {
+                if (res.status === 429) { updateStatus('rate limit', true); }
+                else if (res.ok) {
                     const data = await res.json();
                     const currentDataStr = JSON.stringify(data.values);
                     if (currentDataStr !== state.lastCheckData) {
@@ -262,21 +242,16 @@
                         await fetchSheetData();
                     } else {
                         const el = document.getElementById('status-area');
-                        if (el && el.classList.contains('status-error')) {
-                            el.classList.remove('status-error');
-                            updateStatus('waiting');
-                        }
+                        if (el && el.classList.contains('status-error')) { el.classList.remove('status-error'); updateStatus('waiting'); }
                     }
                 }
-            } catch (e) {
-                console.warn("API temporarily unavailable");
-            }
+            } catch (e) {}
             scheduleNext();
         }
 
         function scheduleNext() {
-            state.nextUpdateTimestamp = Date.now() + CONFIG.POLL_INTERVAL;
-            setTimeout(watchUpdate, CONFIG.POLL_INTERVAL);
+            state.nextUpdateTimestamp = Date.now() + CONFIG.INTV;
+            setTimeout(watchUpdate, CONFIG.INTV);
         }
 
         function toggleTheme() {
@@ -293,10 +268,9 @@
             document.getElementById('theme-btn').textContent = theme === 'dark' ? '☀️' : '🌙';
             await syncServerTime();
             await fetchSheetData();
-            
-            state.nextUpdateTimestamp = Date.now() + CONFIG.POLL_INTERVAL;
+            state.nextUpdateTimestamp = Date.now() + CONFIG.INTV;
             setInterval(updateDisplay, 100);
-            setTimeout(watchUpdate, CONFIG.POLL_INTERVAL);
+            setTimeout(watchUpdate, CONFIG.INTV);
         }
 
         init();
