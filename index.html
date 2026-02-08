@@ -155,14 +155,17 @@
                 }
 
                 data.values.slice(3).forEach((row, index) => {
-                    const label = row[0]?.trim();
+                    const rawLabel = row[0]?.trim();
                     const minute = parseInt(row[1], 10);
-                    // ラベルか分が空なら無視（削除扱い）
-                    if (!label || isNaN(minute)) return;
+
+                    // 重要な修正：名前が空でも「分」さえあれば（無名）として維持
+                    if (isNaN(minute)) return; 
+                    
+                    const label = rawLabel || "(無名)"; 
 
                     const target = getTargetTime(CONFIG.BH, minute + 1);
                     processed.push({ 
-                        id: `timer-${index}`, // 行番号に基づいたユニークID
+                        id: `timer-${index}`, 
                         label: label, 
                         targetDate: target, 
                         type: "normal", 
@@ -170,7 +173,6 @@
                     });
                 });
 
-                // 既存のタイマーを全更新（存在しないものはDOMから消える）
                 renderTimers(processed);
                 updateStatus('updated');
             } catch (e) { 
@@ -192,11 +194,8 @@
 
         function renderTimers(newData) {
             const container = document.getElementById('timer-container');
-            
-            // データの並び替え（終了済みを下に）
             newData.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
 
-            // 現在の表示と新しいデータを比較してDOMを更新
             container.innerHTML = '';
             state.timerData = newData.map(item => {
                 const card = document.createElement('div');
