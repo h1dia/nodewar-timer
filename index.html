@@ -63,8 +63,10 @@
         .timer-card.hidden { opacity: 0; max-height: 0; margin: 0; padding: 0; border: none; pointer-events: none; }
         .timer-card.finished { background: var(--finished-bg); opacity: var(--finished-opacity); transform: scale(0.95); }
 
-        .display { font-size: 4rem; font-weight: 900; margin-bottom: 5px; line-height: 1; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+        /* ラベルがない場合、数字を中央に寄せるための調整 */
+        .display { font-size: 4rem; font-weight: 900; margin-bottom: 0; line-height: 1; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
         .label { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.05em; margin: 8px 0 0 0; }
+        .label:empty { display: none; } /* 中身が空なら要素ごと消す */
 
         .theme-toggle {
             position: fixed; top: 20px; right: 20px; width: 45px; height: 45px;
@@ -155,13 +157,10 @@
                 }
 
                 data.values.slice(3).forEach((row, index) => {
-                    const rawLabel = row[0]?.trim();
+                    const label = row[0]?.trim() || ""; // 空文字を許容
                     const minute = parseInt(row[1], 10);
 
-                    // 重要な修正：名前が空でも「分」さえあれば（無名）として維持
                     if (isNaN(minute)) return; 
-                    
-                    const label = rawLabel || "(無名)"; 
 
                     const target = getTargetTime(CONFIG.BH, minute + 1);
                     processed.push({ 
@@ -201,6 +200,7 @@
                 const card = document.createElement('div');
                 card.id = `card-${item.id}`;
                 card.className = `timer-card ${item.isFinished ? 'finished' : ''}`;
+                // ラベルが空文字の場合は要素を空にする
                 card.innerHTML = `<div id="${item.id}" class="display">--:--:--</div><p class="label">${item.label}</p>`;
                 container.appendChild(card);
                 return item;
