@@ -150,15 +150,27 @@
                 const now = new Date(Date.now() + state.serverOffset);
                 let processed = [];
                 const startTarget = getTargetTime(CONFIG.BH, 0);
-                if (startTarget > now) processed.push({ label: "開始まで", targetDate: startTarget, type: "start", isFinished: false });
+                if (startTarget > now) {
+                    processed.push({ id: "start-timer", label: "開始まで", targetDate: startTarget, type: "start", isFinished: false });
+                }
 
-                data.values.slice(3).forEach(row => {
+                data.values.slice(3).forEach((row, index) => {
+                    const label = row[0]?.trim();
                     const minute = parseInt(row[1], 10);
-                    if (isNaN(minute)) return;
+                    // ラベルか分が空なら無視（削除扱い）
+                    if (!label || isNaN(minute)) return;
+
                     const target = getTargetTime(CONFIG.BH, minute + 1);
-                    processed.push({ label: row[0]?.trim() || "", targetDate: target, type: "normal", isFinished: target <= now });
+                    processed.push({ 
+                        id: `timer-${index}`, // 行番号に基づいたユニークID
+                        label: label, 
+                        targetDate: target, 
+                        type: "normal", 
+                        isFinished: target <= now 
+                    });
                 });
 
+                // 既存のタイマーを全更新（存在しないものはDOMから消える）
                 renderTimers(processed);
                 updateStatus('updated');
             } catch (e) { 
@@ -178,18 +190,21 @@
             return t;
         }
 
-        function renderTimers(data) {
-            data.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
+        function renderTimers(newData) {
             const container = document.getElementById('timer-container');
+            
+            // データの並び替え（終了済みを下に）
+            newData.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
+
+            // 現在の表示と新しいデータを比較してDOMを更新
             container.innerHTML = '';
-            state.timerData = data.map((item, i) => {
-                const id = `timer-${i}`;
+            state.timerData = newData.map(item => {
                 const card = document.createElement('div');
-                card.id = `card-${id}`;
+                card.id = `card-${item.id}`;
                 card.className = `timer-card ${item.isFinished ? 'finished' : ''}`;
-                card.innerHTML = `<div id="${id}" class="display">--:--:--</div><p class="label">${item.label}</p>`;
+                card.innerHTML = `<div id="${item.id}" class="display">--:--:--</div><p class="label">${item.label}</p>`;
                 container.appendChild(card);
-                return { ...item, id };
+                return item;
             });
         }
 
@@ -203,20 +218,26 @@
             state.timerData.forEach(item => {
                 if (item.isFinished) return;
                 const diff = item.targetDate - now;
+                const el = document.getElementById(item.id);
+                if (!el) return;
+
                 if (diff <= 0) {
                     item.isFinished = true;
                     const card = document.getElementById(`card-${item.id}`);
                     if (item.type === "start") {
                         card.classList.add('hidden');
-                        setTimeout(() => { card.remove(); state.timerData = state.timerData.filter(t => t.id !== item.id); }, 600);
+                        setTimeout(() => { 
+                            card.remove(); 
+                            state.timerData = state.timerData.filter(t => t.id !== item.id); 
+                        }, 600);
                     } else {
                         card.classList.add('finished');
-                        document.getElementById(item.id).textContent = "00:00:00";
+                        el.textContent = "00:00:00";
                         needsReorder = true;
                     }
                 } else {
                     const s = Math.ceil(diff / 1000);
-                    document.getElementById(item.id).textContent = [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v => String(v).padStart(2,'0')).join(':');
+                    el.textContent = [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v => String(v).padStart(2,'0')).join(':');
                 }
             });
             if (needsReorder) reorderCards();
