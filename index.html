@@ -131,7 +131,7 @@
     <div class="content-wrapper">
         <header>
             <div class="clock-label">現在時刻</div>
-            <div id="current-time">--:--:--</div>
+            <div id="current-time">00:00:00</div>
             <div id="delay-display">遅延: +0s</div>
         </header>
         <div id="timer-container"></div>
@@ -256,6 +256,7 @@
             document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
             const nextSec = Math.max(0, Math.ceil((state.nextUpdateTimestamp - Date.now()) / 1000));
             document.getElementById('update-countdown').textContent = `${nextSec}S`;
+
             let hasNewFinished = false;
             state.timerData.forEach(item => {
                 if (item.isFinished) return;
@@ -313,10 +314,11 @@
         }
 
         async function init() {
+            setInterval(updateDisplay, 100);
+            updateDisplay();
             await syncServerTime();
             await fetchSheetData();
             state.nextUpdateTimestamp = Date.now() + CONFIG.INTV;
-            setInterval(updateDisplay, 100);
             setTimeout(watchUpdate, CONFIG.INTV);
         }
 
