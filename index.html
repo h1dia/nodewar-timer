@@ -11,8 +11,6 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://h1dia.github.io/nodewar-timer/">
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="拠点戦くん">
-    <meta name="twitter:description" content="砦のカウントダウンをします">
 
     <style>
         :root {
@@ -38,6 +36,32 @@
             font-weight: 700;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh; padding: 40px 20px; box-sizing: border-box;
+        }
+
+        /* 音声コントロールボタン */
+        #audio-control {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: var(--bg-texture);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
+            padding: 10px;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        #audio-control.off {
+            border-color: var(--text-sub);
+            color: var(--text-sub);
+            opacity: 0.6;
         }
 
         .content-wrapper { width: 100%; max-width: 480px; }
@@ -78,7 +102,6 @@
         }
 
         .label { font-size: 1.1rem; color: var(--text-main); margin: 15px 0 0 0; letter-spacing: 0.15em; }
-        .label:empty { display: none; }
 
         .timer-card.finished {
             background: var(--finished-bg); border-color: var(--finished-border); opacity: 0.5;
@@ -86,7 +109,6 @@
         }
         .timer-card.finished .display { color: #663333; }
         .timer-card.finished .label { color: #666; text-decoration: line-through; }
-        .timer-card.finished::before, .timer-card.finished::after { border-color: var(--finished-border); }
 
         .bottom-badge {
             position: fixed; font-size: 0.65rem; padding: 6px 15px;
@@ -99,6 +121,8 @@
     </style>
 </head>
 <body>
+
+    <button id="audio-control" class="off" onclick="toggleAudio()" title="音声を切り替え">🔇</button>
 
     <div class="content-wrapper">
         <header>
@@ -127,7 +151,37 @@
             INTV: 15000 
         };
 
-        let state = { timerData: [], serverOffset: 0, lastCheckData: "", delaySeconds: 0, nextUpdateTimestamp: 0 };
+        let state = { timerData: [], serverOffset: 0, lastCheckData: "", delaySeconds: 0, nextUpdateTimestamp: 0, audioEnabled: false };
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function toggleAudio() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            state.audioEnabled = !state.audioEnabled;
+            const btn = document.getElementById('audio-control');
+            btn.textContent = state.audioEnabled ? "🔊" : "🔇";
+            btn.classList.toggle('off', !state.audioEnabled);
+        }
+
+        function playNotifySound() {
+            if (!state.audioEnabled || !audioCtx) return;
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
+                oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.2);
+            } catch (e) {}
+        }
 
         const updateStatus = (text) => {
             const txtEl = document.getElementById('status-text');
@@ -140,23 +194,19 @@
         async function fetchSheetData() {
             updateStatus('syncing');
             const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SID}/values/${encodeURIComponent(CONFIG.RG)}?key=${CONFIG.TID}`;
-            
             try {
                 const response = await fetch(url);
                 const data = await response.json();
                 if (!data.values) return;
-
                 document.getElementById('warning-area').classList.toggle('show', !!(data.values[1]?.[0] && data.values[1][0].trim()));
                 state.delaySeconds = parseInt(data.values[0]?.[1], 10) || 0;
                 document.getElementById('delay-display').textContent = `遅延: +${state.delaySeconds}s`;
-
                 const now = new Date(Date.now() + state.serverOffset);
                 let processed = [];
                 const startTarget = getTargetTime(CONFIG.BH, 0);
                 if (startTarget > now) {
                     processed.push({ id: "start-timer", label: "戦闘開始まで", targetDate: startTarget, type: "start", isFinished: false });
                 }
-
                 data.values.slice(3).forEach((row, index) => {
                     const label = row[0]?.trim() || "";
                     const minute = parseInt(row[1], 10);
@@ -164,7 +214,6 @@
                     const target = getTargetTime(CONFIG.BH, minute + 1);
                     processed.push({ id: `timer-${index}`, label: label, targetDate: target, type: "normal", isFinished: target <= now });
                 });
-
                 renderTimers(processed);
                 updateStatus('active');
             } catch (e) { updateStatus('offline'); }
@@ -180,13 +229,12 @@
         function renderTimers(newData) {
             const container = document.getElementById('timer-container');
             newData.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
-
             container.innerHTML = '';
             state.timerData = newData.map(item => {
                 const card = document.createElement('div');
                 card.id = `card-${item.id}`;
                 card.className = `timer-card ${item.isFinished ? 'finished' : ''}`;
-                card.innerHTML = `<div id="${item.id}" class="display">--:--:--</div><p class="label">${item.label}</p>`;
+                card.innerHTML = `<div id="${item.id}" class="display">${item.isFinished ? '00:00:00' : '--:--:--'}</div><p class="label">${item.label}</p>`;
                 container.appendChild(card);
                 return item;
             });
@@ -204,17 +252,15 @@
             document.getElementById('current-time').textContent = now.toTimeString().split(' ')[0];
             const nextSec = Math.max(0, Math.ceil((state.nextUpdateTimestamp - Date.now()) / 1000));
             document.getElementById('update-countdown').textContent = `${nextSec}S`;
-
             let hasNewFinished = false;
-
             state.timerData.forEach(item => {
                 if (item.isFinished) return;
                 const diff = item.targetDate - now;
                 const el = document.getElementById(item.id);
                 if (!el) return;
-
                 if (diff <= 0) {
                     item.isFinished = true;
+                    playNotifySound(); 
                     const card = document.getElementById(`card-${item.id}`);
                     if (item.type === "start") {
                         card.style.opacity = '0';
@@ -229,7 +275,6 @@
                     el.textContent = [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v => String(v).padStart(2,'0')).join(':');
                 }
             });
-
             if (hasNewFinished) reorderCards();
         }
 
