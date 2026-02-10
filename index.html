@@ -38,28 +38,28 @@
             font-weight: 700;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh; 
-            padding: 50px 20px; /* 余白を拡大 */
+            padding: 50px 20px;
             box-sizing: border-box;
         }
 
         /* 音声コントロールボタン */
         #audio-control {
             position: fixed;
-            top: 25px;   /* 位置調整 */
-            right: 25px; /* 位置調整 */
+            top: 25px;
+            right: 25px;
             z-index: 1000;
             background: var(--bg-texture);
             border: 1px solid var(--accent-gold);
             color: var(--accent-gold);
             padding: 10px;
             border-radius: 50%;
-            width: 54px;  /* 44px -> 54px */
-            height: 54px; /* 44px -> 54px */
+            width: 54px;
+            height: 54px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem; /* 1.2rem -> 1.5rem */
+            font-size: 1.5rem;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
             transition: all 0.3s ease;
         }
@@ -69,7 +69,6 @@
             opacity: 0.6;
         }
 
-        /* コンテナ幅を1.25倍に (520px -> 650px) */
         .content-wrapper { width: 100%; max-width: 650px; }
 
         header {
@@ -85,14 +84,14 @@
             bottom: 0; 
             left: 0; 
             width: 100%; 
-            height: 3px; /* 少し太く */
+            height: 3px;
             background: linear-gradient(90deg, rgba(198, 160, 109, 0) 0%, rgba(198, 160, 109, 1) 50%, rgba(198, 160, 109, 0) 100%);
         }
 
         .clock-label { font-size: 1rem; color: var(--text-gold); letter-spacing: 0.4em; margin-bottom: 10px; }
         #current-time { 
             font-family: var(--font-timer); 
-            font-size: 3.2rem; /* 2.5rem -> 3.2rem */
+            font-size: 3.2rem;
             color: var(--text-main); 
             letter-spacing: 0.05em; 
         }
@@ -102,7 +101,7 @@
 
         .timer-card {
             background: var(--bg-texture); border: 1px solid var(--accent-gold-low);
-            padding: 20px 25px; /* パディング拡大 */
+            padding: 20px 25px;
             position: relative; 
             display: flex;             
             justify-content: space-between; 
@@ -113,14 +112,14 @@
         }
 
         .timer-card::before, .timer-card::after {
-            content: ""; position: absolute; width: 14px; height: 14px; border: 3px solid var(--accent-gold); /* 装飾も少し大きく */
+            content: ""; position: absolute; width: 14px; height: 14px; border: 3px solid var(--accent-gold);
         }
         .timer-card::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
         .timer-card::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
 
         .display {
             font-family: var(--font-timer); 
-            font-size: 3rem; /* 2.4rem -> 3rem */
+            font-size: 3rem;
             font-weight: 900;
             color: var(--text-gold); 
             line-height: 1; 
@@ -128,11 +127,11 @@
             letter-spacing: 0.02em; 
             font-variant-numeric: tabular-nums;
             text-align: right;
-            min-width: 230px; /* 幅を確保 */
+            min-width: 230px;
         }
 
         .label { 
-            font-size: 1.4rem; /* 1.1rem -> 1.4rem */
+            font-size: 1.4rem;
             color: var(--text-main); 
             margin: 0; 
             letter-spacing: 0.05em; 
@@ -151,7 +150,7 @@
 
         .bottom-badge {
             position: fixed; 
-            font-size: 0.8rem; /* 0.65rem -> 0.8rem */
+            font-size: 0.8rem;
             padding: 8px 18px;
             background: rgba(0,0,0,0.8); border: 1px solid var(--accent-gold-low);
             color: var(--text-sub); z-index: 100;
@@ -160,7 +159,7 @@
         #warning-area { bottom: 15px; left: 15px; color: #ff5252; border-color: #ff5252; opacity: 0; }
         #warning-area.show { opacity: 1; }
 
-        @media (max-width: 500px) { /* ブレークポイントも調整 */
+        @media (max-width: 500px) {
             .timer-card { flex-direction: column; align-items: flex-start; gap: 8px; }
             .display { width: 100%; text-align: right; font-size: 3.5rem; }
         }
@@ -210,6 +209,11 @@
             const btn = document.getElementById('audio-control');
             btn.textContent = state.audioEnabled ? "🔊" : "🔇";
             btn.classList.toggle('off', !state.audioEnabled);
+
+            // 音声をONにした時だけデモ音を鳴らす
+            if (state.audioEnabled) {
+                playNotifySound();
+            }
         }
 
         function playNotifySound() {
