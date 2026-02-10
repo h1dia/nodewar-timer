@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <title>拠点戦くん</title>
+    <meta name="description" content="砦のカウントダウンをします">
+    <meta property="og:title" content="拠点戦くん">
+    <meta property="og:description" content="砦のカウントダウンをします">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://h1dia.github.io/nodewar-timer/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="拠点戦くん">
+    <meta name="twitter:description" content="砦のカウントダウンをします">
+
     <style>
         :root {
             --bg-base: #0a0a0a;
@@ -73,7 +82,7 @@
 
         .timer-card.finished {
             background: var(--finished-bg); border-color: var(--finished-border); opacity: 0.5;
-            order: 999; /* CSSでも最後尾に送る */
+            order: 999; 
         }
         .timer-card.finished .display { color: #663333; }
         .timer-card.finished .label { color: #666; text-decoration: line-through; }
@@ -170,7 +179,6 @@
 
         function renderTimers(newData) {
             const container = document.getElementById('timer-container');
-            // 最初は時間順、終了済みは後ろへ
             newData.sort((a, b) => (a.isFinished !== b.isFinished) ? (a.isFinished ? 1 : -1) : (a.targetDate - b.targetDate));
 
             container.innerHTML = '';
@@ -184,7 +192,6 @@
             });
         }
 
-        // カードを並び替える関数
         function reorderCards() {
             const container = document.getElementById('timer-container');
             const cards = [...container.children];
@@ -215,7 +222,7 @@
                     } else {
                         card.classList.add('finished');
                         el.textContent = "00:00:00";
-                        hasNewFinished = true; // 並び替えフラグを立てる
+                        hasNewFinished = true;
                     }
                 } else {
                     const s = Math.ceil(diff / 1000);
@@ -223,7 +230,6 @@
                 }
             });
 
-            // 新しく終了した砦があれば、リストを並び替える
             if (hasNewFinished) reorderCards();
         }
 
